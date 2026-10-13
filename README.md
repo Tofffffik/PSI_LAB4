@@ -1,17 +1,95 @@
-# currency_trends
+# Курсы валют — мобильное приложение
 
-A new Flutter project.
+Лабораторная работа №4: конвертер валют для Android с экранами сравнения
+курса за неделю и за месяц. Написан на Dart (Flutter).
 
-## Getting Started
+## Возможности
 
-This project is a starting point for a Flutter application.
+- **Конвертер**: сумма, пара валют, результат, дата курса и источник.
+- **Неделя** и **Месяц**: график курса выбранной пары, минимум, максимум,
+  среднее, изменение в единицах курса и в процентах, тенденция (рост,
+  падение, без изменений).
+- **Работа без сети**: показывается последний сохранённый ряд курсов с
+  датой и временем его получения. Кэш переживает перезапуск приложения.
+- **Ошибки**: недоступный источник, пустой или некорректный ответ дают
+  понятное сообщение и кнопку «Повторить».
 
-A few resources to get you started if this is your first Flutter project:
+## Требования
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- Flutter 3.47 или новее (Dart 3.13)
+- Android SDK с NDK 28.2 и эмулятор или телефон с Android
+- В Windows должен быть включён «Режим разработчика» — Flutter нужны
+  символические ссылки для плагинов
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Запуск
+
+Создайте эмулятор в Android Studio (Device Manager → Create Virtual
+Device, любой образ x86_64), запустите его и дождитесь рабочего стола
+Android. Затем:
+
+```bash
+flutter run
+```
+
+Без эмулятора приложение можно посмотреть как окно Windows:
+
+```bash
+flutter run -d windows
+```
+
+Первая сборка занимает несколько минут: строка `Running Gradle task
+'assembleDebug'...` долго не меняется — это нормально, прерывать не надо.
+
+Собрать APK без запуска:
+
+```bash
+flutter build apk --debug
+```
+
+## Тесты
+
+```bash
+flutter test
+```
+
+Тесты не обращаются к сети и не требуют устройства.
+
+## Источник данных
+
+[Frankfurter](https://frankfurter.dev) — бесплатный API с курсами
+Европейского центрального банка, ключ не нужен. Один запрос возвращает
+ряд курсов за весь период:
+
+```text
+https://api.frankfurter.dev/v1/2026-08-31..2026-09-30?base=USD&symbols=EUR
+```
+
+Ограничения описаны в [REPORT.md](REPORT.md).
+
+## Структура
+
+```text
+lib/
+  models.dart            типы данных
+  rates_parser.dart      разбор ответа источника
+  stats.dart             статистика за период
+  amount.dart            проверка введённой суммы
+  rates_repository.dart  сеть + откат на сохранённые данные
+  platform_io.dart       настоящие HTTP и хранилище
+  main.dart              каркас приложения и выбор пары валют
+  ui/                    экраны, график, общие виджеты
+test/                    unit-тесты
+```
+
+## Ветки
+
+| Ветка | Содержимое |
+|-------|------------|
+| `01-logic` | модели, разбор, статистика, валидация, репозиторий |
+| `02-ui` | экраны и график |
+| `03-tests` | unit-тесты и настройка сборки под Android |
+| `04-design` | оформление: тема Material 3, карточки, график с заливкой |
+| `05-report` | README и отчёт |
+
+Каждая ветка основана на предыдущей и вливается в `main` отдельным
+Pull Request в этом порядке.
