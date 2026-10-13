@@ -3,32 +3,34 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import 'common.dart';
 
-/// Линейный график курса во времени.
+/// Линейный график курса во времени с градиентной заливкой под линией.
 class RateChart extends StatelessWidget {
-  const RateChart({super.key, required this.points});
+  const RateChart({super.key, required this.points, required this.color});
 
   final List<RatePoint> points;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return CustomPaint(
-      painter: _ChartPainter(points, scheme.primary, scheme.outlineVariant, scheme.onSurfaceVariant),
+      painter: _ChartPainter(points, color, scheme.outlineVariant, scheme.onSurfaceVariant, scheme.surfaceContainerLow),
       child: const SizedBox.expand(),
     );
   }
 }
 
 class _ChartPainter extends CustomPainter {
-  _ChartPainter(this.points, this.lineColor, this.gridColor, this.textColor);
+  _ChartPainter(this.points, this.lineColor, this.gridColor, this.textColor, this.background);
 
   final List<RatePoint> points;
   final Color lineColor;
   final Color gridColor;
   final Color textColor;
+  final Color background;
 
   static const double _left = 56;
-  static const double _bottom = 20;
+  static const double _bottom = 22;
   static const double _top = 8;
 
   @override
@@ -50,11 +52,15 @@ class _ChartPainter extends CustomPainter {
     }
 
     final plot = Rect.fromLTRB(_left, _top, size.width - 4, size.height - _bottom);
+
+    // Три горизонтальные линии сетки: максимум, середина, минимум.
     final grid = Paint()
-      ..color = gridColor
+      ..color = gridColor.withValues(alpha: 0.5)
       ..strokeWidth = 1;
-    canvas.drawLine(plot.topLeft, plot.topRight, grid);
-    canvas.drawLine(plot.bottomLeft, plot.bottomRight, grid);
+    for (var i = 0; i <= 2; i++) {
+      final y = plot.top + plot.height * i / 2;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
+    }
 
     Offset place(int index) {
       final x = points.length == 1
@@ -64,27 +70,46 @@ class _ChartPainter extends CustomPainter {
       return Offset(x, y);
     }
 
-    final line = Paint()
-      ..color = lineColor
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeJoin = StrokeJoin.round;
-    final path = Path()..moveTo(place(0).dx, place(0).dy);
+    final line = Path()..moveTo(place(0).dx, place(0).dy);
     for (var i = 1; i < points.length; i++) {
-      path.lineTo(place(i).dx, place(i).dy);
-    }
-    canvas.drawPath(path, line);
-
-    final dot = Paint()..color = lineColor;
-    for (var i = 0; i < points.length; i++) {
-      canvas.drawCircle(place(i), 3, dot);
+      line.lineTo(place(i).dx, place(i).dy);
     }
 
-    _label(canvas, max.toStringAsFixed(4), Offset(0, plot.top - 6));
-    _label(canvas, min.toStringAsFixed(4), Offset(0, plot.bottom - 8));
-    _label(canvas, formatDate(points.first.date), Offset(plot.left, plot.bottom + 4));
-    final last = formatDate(points.last.date);
-    _label(canvas, last, Offset(plot.right - _measure(last).width, plot.bottom + 4));
+    final area = Path.from(line)
+      ..lineTo(place(points.length - 1).dx, plot.bottom)
+      ..lineTo(place(0).dx, plot.bottom)
+      ..close();
+    canvas.drawPath(
+      area,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [lineColor.withValues(alpha: 0.35), lineColor.withValues(alpha: 0.0)],
+        ).createShader(plot),
+    );
+
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = lineColor
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // Последняя точка — выделенный кружок.
+    final last = place(points.length - 1);
+    canvas.drawCircle(last, 6, Paint()..color = background);
+    canvas.drawCircle(last, 4.5, Paint()..color = lineColor);
+
+    _label(canvas, max.toStringAsFixed(4), Offset(0, plot.top - 7));
+    _label(canvas, ((max + min) / 2).toStringAsFixed(4), Offset(0, plot.center.dy - 7));
+    _label(canvas, min.toStringAsFixed(4), Offset(0, plot.bottom - 7));
+    _label(canvas, formatDate(points.first.date), Offset(plot.left, plot.bottom + 6));
+    final lastDate = formatDate(points.last.date);
+    _label(canvas, lastDate, Offset(plot.right - _measure(lastDate).width, plot.bottom + 6));
   }
 
   TextPainter _measure(String text) {
@@ -99,5 +124,6 @@ class _ChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ChartPainter old) => old.points != points || old.lineColor != lineColor;
+  bool shouldRepaint(_ChartPainter old) =>
+      old.points != points || old.lineColor != lineColor || old.background != background;
 }

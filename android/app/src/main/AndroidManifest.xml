@@ -2,7 +2,7 @@
     <!-- Курсы загружаются из сети; без разрешения release-сборка их не получит. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="currency_trends"
+        android:label="Курсы валют"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
