@@ -57,71 +57,155 @@ class _TrendTabState extends State<TrendTab> {
           return const Center(child: Text('За период нет данных.'));
         }
 
+        final theme = Theme.of(context);
         final sign = stats.change > 0 ? '+' : '';
+        final trendColor = _trendColor(context, stats.trend);
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
             CacheBanner(result: data),
-            Text(
-              '${widget.from} → ${widget.to}, последние ${widget.days} дней',
-              style: Theme.of(context).textTheme.titleMedium,
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${widget.from} → ${widget.to} · последние ${widget.days} дней',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      data.points.last.rate.toStringAsFixed(4),
+                      style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    _TrendPill(trend: stats.trend, color: trendColor),
+                    const SizedBox(height: 16),
+                    SizedBox(height: 190, child: RateChart(points: data.points, color: trendColor)),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 12),
-            SizedBox(height: 200, child: RateChart(points: data.points)),
-            const SizedBox(height: 16),
-            _TrendCard(trend: stats.trend),
-            _row('Минимум', stats.min.toStringAsFixed(4)),
-            _row('Максимум', stats.max.toStringAsFixed(4)),
-            _row('Среднее', stats.average.toStringAsFixed(4)),
-            _row('Изменение', '$sign${stats.change.toStringAsFixed(4)}'),
-            _row('Изменение, %', '$sign${stats.changePercent.toStringAsFixed(2)} %'),
-            const SizedBox(height: 12),
-            Text(
-              'Точек: ${data.points.length} (курс публикуется по рабочим дням) · '
-              'Источник: $sourceName',
-              style: Theme.of(context).textTheme.bodySmall,
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.3,
+              children: [
+                _StatTile(icon: Icons.south, label: 'Минимум', value: stats.min.toStringAsFixed(4)),
+                _StatTile(icon: Icons.north, label: 'Максимум', value: stats.max.toStringAsFixed(4)),
+                _StatTile(icon: Icons.functions, label: 'Среднее', value: stats.average.toStringAsFixed(4)),
+                _StatTile(
+                  icon: Icons.data_usage,
+                  label: 'Точек данных',
+                  value: '${data.points.length}',
+                ),
+                _StatTile(
+                  icon: Icons.swap_vert,
+                  label: 'Изменение',
+                  value: '$sign${stats.change.toStringAsFixed(4)}',
+                  valueColor: trendColor,
+                ),
+                _StatTile(
+                  icon: Icons.percent,
+                  label: 'Изменение, %',
+                  value: '$sign${stats.changePercent.toStringAsFixed(2)} %',
+                  valueColor: trendColor,
+                ),
+              ],
             ),
+            const SizedBox(height: 12),
+            InfoLine(
+              icon: Icons.event,
+              text: 'Период: ${formatDate(data.points.first.date)} – ${formatDate(data.points.last.date)} '
+                  '(курс публикуется по рабочим дням)',
+            ),
+            const InfoLine(icon: Icons.account_balance, text: 'Источник: $sourceName'),
           ],
         );
       },
     );
   }
 
-  Widget _row(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+  static Color _trendColor(BuildContext context, Trend trend) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return switch (trend) {
+      Trend.up => dark ? const Color(0xFF6EE7A0) : const Color(0xFF15803D),
+      Trend.down => dark ? const Color(0xFFFF8A8A) : const Color(0xFFC62828),
+      Trend.flat => Theme.of(context).colorScheme.onSurfaceVariant,
+    };
+  }
+}
+
+/// Явное указание тенденции: значок и слово.
+class _TrendPill extends StatelessWidget {
+  const _TrendPill({required this.trend, required this.color});
+
+  final Trend trend;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, text) = switch (trend) {
+      Trend.up => (Icons.trending_up, 'Рост'),
+      Trend.down => (Icons.trending_down, 'Падение'),
+      Trend.flat => (Icons.trending_flat, 'Без изменений'),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Text('Тенденция: $text', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 }
 
-class _TrendCard extends StatelessWidget {
-  const _TrendCard({required this.trend});
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.icon, required this.label, required this.value, this.valueColor});
 
-  final Trend trend;
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
-    final (icon, text, color) = switch (trend) {
-      Trend.up => (Icons.trending_up, 'Тенденция: рост', Colors.green.shade700),
-      Trend.down => (Icons.trending_down, 'Тенденция: падение', Colors.red.shade700),
-      Trend.flat => (Icons.trending_flat, 'Тенденция: без изменений', Colors.grey.shade700),
-    };
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
-        ],
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(label, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: valueColor),
+            ),
+          ],
+        ),
       ),
     );
   }

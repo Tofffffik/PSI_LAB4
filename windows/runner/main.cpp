@@ -27,7 +27,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"currency_trends", origin, size)) {
+  // «Курсы валют» через \u, чтобы не зависеть от кодировки исходника в MSVC.
+  if (!window.Create(L"\u041a\u0443\u0440\u0441\u044b \u0432\u0430\u043b\u044e\u0442", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

@@ -45,8 +45,7 @@ class _ConverterTabState extends State<ConverterTab> {
     setState(() {
       if (amount.isValid) {
         _error = null;
-        _result = '${_amount.text.trim()} ${widget.from} = '
-            '${(amount.value! * latest.rate).toStringAsFixed(2)} ${widget.to}';
+        _result = (amount.value! * latest.rate).toStringAsFixed(2);
       } else {
         _error = amount.error;
         _result = null;
@@ -68,6 +67,7 @@ class _ConverterTabState extends State<ConverterTab> {
 
         final data = snapshot.data!;
         final latest = data.points.last;
+        final theme = Theme.of(context);
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -75,9 +75,11 @@ class _ConverterTabState extends State<ConverterTab> {
             TextField(
               controller: _amount,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: theme.textTheme.headlineSmall,
               decoration: InputDecoration(
                 labelText: 'Сумма',
-                border: const OutlineInputBorder(),
+                hintText: '0',
+                suffixText: widget.from,
                 errorText: _error,
               ),
               // Изменение ввода скрывает старый результат и ошибку.
@@ -87,20 +89,84 @@ class _ConverterTabState extends State<ConverterTab> {
               }),
             ),
             const SizedBox(height: 12),
-            FilledButton(
+            FilledButton.icon(
               // Кнопка неактивна, пока сумма не введена.
               onPressed: _amount.text.trim().isEmpty ? null : () => _convert(latest),
-              child: const Text('Конвертировать'),
+              icon: const Icon(Icons.currency_exchange),
+              label: const Text('Конвертировать'),
             ),
-            const SizedBox(height: 20),
-            if (_result != null)
-              Text(_result!, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 16),
+            _ResultCard(
+              amount: _result == null ? null : _amount.text.trim(),
+              result: _result,
+              from: widget.from,
+              to: widget.to,
+              rate: latest.rate,
+            ),
             const SizedBox(height: 12),
-            Text('1 ${widget.from} = ${latest.rate.toStringAsFixed(4)} ${widget.to}'),
-            Text('Курс на ${formatDate(latest.date)} · Источник: $sourceName'),
+            InfoLine(icon: Icons.event, text: 'Курс на ${formatDate(latest.date)}'),
+            const InfoLine(icon: Icons.account_balance, text: 'Источник: $sourceName'),
           ],
         );
       },
+    );
+  }
+}
+
+/// Крупная карточка с результатом и курсом за единицу.
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({
+    required this.amount,
+    required this.result,
+    required this.from,
+    required this.to,
+    required this.rate,
+  });
+
+  final String? amount;
+  final String? result;
+  final String from;
+  final String to;
+  final double rate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              result == null ? 'Введите сумму' : '$amount $from =',
+              style: TextStyle(color: scheme.onPrimaryContainer.withValues(alpha: 0.75)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              result == null ? '—' : '$result $to',
+              style: theme.textTheme.displaySmall?.copyWith(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: scheme.onPrimaryContainer.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '1 $from = ${rate.toStringAsFixed(4)} $to',
+                style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
