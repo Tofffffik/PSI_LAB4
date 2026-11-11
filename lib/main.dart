@@ -1,122 +1,107 @@
 import 'package:flutter/material.dart';
 
+import 'platform_io.dart';
+import 'rates_repository.dart';
+import 'ui/converter_tab.dart';
+import 'ui/trend_tab.dart';
+
 void main() {
-  runApp(const MyApp());
+  runApp(CurrencyApp(repository: RatesRepository(fetch: httpFetch, store: PrefsStore())));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Валюты, которые публикует ЕЦБ и отдаёт Frankfurter.
+const List<String> currencies = [
+  'USD', 'EUR', 'GBP', 'CHF', 'JPY', 'RON', 'PLN', 'CZK', 'SEK', 'NOK', 'TRY', 'CNY', 'CAD', 'AUD',
+];
 
-  // This widget is the root of your application.
+class CurrencyApp extends StatelessWidget {
+  const CurrencyApp({super.key, required this.repository});
+
+  final RatesRepository repository;
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'Курсы валют',
+      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+      home: HomePage(repository: repository),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, required this.repository});
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+  final RatesRepository repository;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+class _HomePageState extends State<HomePage> {
+  String _from = 'USD';
+  String _to = 'EUR';
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    // Ключ с парой валют: при её смене вкладка создаётся заново и
+    // перезагружает данные.
+    final pair = '$_from-$_to';
+    final body = switch (_tab) {
+      0 => ConverterTab(key: ValueKey('c-$pair'), repository: widget.repository, from: _from, to: _to),
+      1 => TrendTab(key: ValueKey('w-$pair'), repository: widget.repository, from: _from, to: _to, days: 7),
+      _ => TrendTab(key: ValueKey('m-$pair'), repository: widget.repository, from: _from, to: _to, days: 30),
+    };
+
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      appBar: AppBar(title: const Text('Курсы валют')),
+      body: SafeArea(
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(child: _currencyBox('Из', _from, (v) => setState(() => _from = v))),
+                  IconButton(
+                    tooltip: 'Поменять местами',
+                    icon: const Icon(Icons.swap_horiz),
+                    onPressed: () => setState(() {
+                      final from = _from;
+                      _from = _to;
+                      _to = from;
+                    }),
+                  ),
+                  Expanded(child: _currencyBox('В', _to, (v) => setState(() => _to = v))),
+                ],
+              ),
             ),
+            Expanded(child: body),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (index) => setState(() => _tab = index),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.currency_exchange), label: 'Конвертер'),
+          NavigationDestination(icon: Icon(Icons.view_week), label: 'Неделя'),
+          NavigationDestination(icon: Icon(Icons.calendar_month), label: 'Месяц'),
+        ],
       ),
+    );
+  }
+
+  Widget _currencyBox(String label, String value, ValueChanged<String> onChanged) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      key: ValueKey('$label-$value'),
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      items: [for (final code in currencies) DropdownMenuItem(value: code, child: Text(code))],
+      onChanged: (code) {
+        if (code != null) onChanged(code);
+      },
     );
   }
 }
